@@ -168,9 +168,25 @@ function useAsync<T extends {}>(
     (...args) => {
       if (deferFn) {
         lastArgs.current = args
-        start(() => deferFn(args, lastOptions.current, abortController.current))
-          .then(handleResolve(counter.current))
-          .catch(handleReject(counter.current))
+        return start(() => deferFn(args, lastOptions.current, abortController.current))
+          .then(
+            ((handler: (value: T) => void) => (value: T) => {
+              handler(value)
+              return {
+                state: "success",
+                value: value,
+              }
+            })(handleResolve(counter.current))
+          )
+          .catch(
+            ((handler: (err: Error) => void) => (err: Error) => {
+              handler(err)
+              return {
+                state: "error",
+                error: err,
+              }
+            })(handleReject(counter.current))
+          )
       }
     },
     [start, deferFn, handleResolve, handleReject]

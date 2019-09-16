@@ -96,7 +96,7 @@ describe("useAsync", () => {
       return (
         <button
           onClick={() => {
-            run(count)
+            run(count).catch(() => {})
             setCount(1)
           }}
         >
@@ -114,17 +114,51 @@ describe("useAsync", () => {
   })
 })
 
-test("does not return a new `run` function on every render", async () => {
+// test("does not return a new `run` function on every render", async () => {
+//   const deferFn = () => resolveTo("done")
+//   const DeleteScheduleForm = () => {
+//     const [value, setValue] = React.useState()
+//     const { run } = useAsync({ deferFn, onReject: () => {} })
+//     React.useEffect(() => value && run(), [value, run])
+//     return <button onClick={() => setValue(true)}>run</button>
+//   }
+//   const component = <DeleteScheduleForm />
+//   const { getByText } = render(component)
+//   fireEvent.click(getByText("run"))
+// })
+
+test("run resolves to result object", async () => {
   const deferFn = () => resolveTo("done")
-  const DeleteScheduleForm = () => {
-    const [value, setValue] = React.useState()
+  const testFn = jest.fn()
+  function App() {
     const { run } = useAsync({ deferFn })
-    React.useEffect(() => value && run(), [value, run])
-    return <button onClick={() => setValue(true)}>run</button>
+    return <button onClick={() => run().then(testFn)}>run</button>
   }
-  const component = <DeleteScheduleForm />
-  const { getByText } = render(component)
+  const { getByText } = render(<App />)
   fireEvent.click(getByText("run"))
+  await sleep(10) // resolve deferFn
+  expect(testFn).toHaveBeenCalledWith({ state: "success", value: "done" })
+})
+
+test("run rejects with error of deferFn", async () => {
+  const deferFn = () => Promise.reject("fail")
+  const testFn = jest.fn()
+  function App() {
+    const { run } = useAsync({ deferFn: deferFn })
+    return (
+      <button
+        onClick={() => {
+          return run().then(testFn)
+        }}
+      >
+        run
+      </button>
+    )
+  }
+  const { getByText } = render(<App />)
+  fireEvent.click(getByText("run"))
+  await sleep(10) // resolve deferFn
+  expect(testFn).toHaveBeenCalledWith({ state: "error", error: "fail" })
 })
 
 describe("useFetch", () => {
